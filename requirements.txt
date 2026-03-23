@@ -1,0 +1,35 @@
+# Core Scientific Computing
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+tensorflow>=2.13.0
+torch>=2.0.0
+transformers>=4.30.0
+
+# NLP and Semantic Processing
+nltk>=3.8.0
+spacy>=3.6.0
+gensim>=4.3.0
+
+# Reinforcement Learning
+gym>=0.26.0
+stable-baselines3>=2.0.0
+
+# Stochastic Modeling
+pykalman>=0.9.5
+statsmodels>=0.14.0
+lifelines>=0.27.0
+
+# Visualization
+plotly>=5.14.0
+networkx>=3.1
+
+# Utilities
+tqdm>=4.65.0
+joblib>=1.3.0
+ipywidgets>=8.0.0
