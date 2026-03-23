@@ -166,9 +166,8 @@ The simulation validates:
   title={Integrated Work System Design in AI–IoT Environments: A Stochastic, Cognitive, and Semantic Modelling Approach},
   author={Pal, Gourab},
   institution={Indian Institute of Technology, Kharagpur},
-  department={Industrial and Systems Engineering},
+  department={Manufacturing Science and Engineering},
   year={2025},
-  supervisor={Prof. Subhajit Sidhanta}
 }
 ```
 
@@ -179,9 +178,8 @@ This project is for academic research and educational purposes.
 ## Author
 
 **Gourab Pal (22MF3IM08)**  
-Department of Industrial and Systems Engineering  
+Manufacturing Science and Engineering  
 Indian Institute of Technology, Kharagpur  
-Under the guidance of Prof. Subhajit Sidhanta
 
 ## Contact
 
