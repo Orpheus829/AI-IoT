@@ -8,6 +8,8 @@ from typing import List, Dict, Tuple, Optional
 from collections import Counter
 import re
 
+from modules.bert_wsd import BERTSemanticDisambiguation
+
 class LeskAlgorithm:
     """
     Lesk Algorithm for WSD (Chapter 10.1)
@@ -191,6 +193,7 @@ class IntegratedWSDSystem:
         self.lesk = LeskAlgorithm(self.glosses)
         self.embedding_wsd = ContextEmbeddingWSD(self.glosses)
         self.ambiguity_calc = SemanticAmbiguityCalculator()
+        self.bert_wsd = BERTSemanticDisambiguation(sense_inventory)
         
     def _create_default_glosses(self) -> Dict[str, Dict[str, str]]:
         """Create default glossary from inventory"""
@@ -199,8 +202,7 @@ class IntegratedWSDSystem:
             glosses[word] = {sense: f"definition of {sense}" for sense in senses}
         return glosses
     
-    def disambiguate(self, word: str, context: str, 
-                     method: str = 'ensemble') -> Dict:
+    def disambiguate(self, word, context, method = 'bert') -> Dict:
         """
         Disambiguate word in context
         
@@ -217,15 +219,10 @@ class IntegratedWSDSystem:
                 'all_scores': {sense: score}
             }
         """
-        if word not in self.inventory:
-            return {
-                'sense': 'unknown',
-                'confidence': 0.0,
-                'ambiguity': 1.0,
-                'all_scores': {}
-            }
+        if method == 'bert':
+            return self.bert_wsd.disambiguate(word, context)
         
-        if method == 'lesk':
+        elif method == 'lesk':
             sense, conf = self.lesk.disambiguate(word, context)
             all_scores = {sense: conf}
             

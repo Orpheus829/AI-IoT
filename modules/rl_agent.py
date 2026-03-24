@@ -7,6 +7,12 @@ import numpy as np
 from typing import Tuple, Dict, Optional, List
 from dataclasses import dataclass
 
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from collections import deque
+import random
+
 @dataclass
 class MDPState:
     """State representation for MDP"""
@@ -299,3 +305,156 @@ if __name__ == "__main__":
             break
     
     print(f"\nTotal reward: {total_reward:.2f}")
+
+
+
+
+class DQNNetwork(nn.Module):
+    """Deep Q-Network for task allocation"""
+    
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(DQNNetwork, self).__init__()
+        
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim)
+        )
+    
+    def forward(self, state):
+        return self.network(state)
+
+
+class DQNAgent:
+    """Deep Q-Learning Agent with Experience Replay"""
+    
+    def __init__(self, state_dim=3, action_dim=3, 
+                 learning_rate=0.001, gamma=0.95, epsilon=0.1):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Q-networks
+        self.q_network = DQNNetwork(state_dim, action_dim).to(self.device)
+        self.target_network = DQNNetwork(state_dim, action_dim).to(self.device)
+        self.target_network.load_state_dict(self.q_network.state_dict())
+        
+        self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate)
+        self.criterion = nn.MSELoss()
+        
+        # Hyperparameters
+        self.gamma = gamma
+        self.epsilon = epsilon
+        
+        # Experience replay buffer
+        self.replay_buffer = deque(maxlen=10000)
+        self.batch_size = 64
+        
+        # Metrics
+        self.episode_rewards = []
+        self.losses = []
+    
+    def select_action(self, state, greedy=False):
+        """Epsilon-greedy action selection"""
+        if not greedy and random.random() < self.epsilon:
+            return random.randint(0, 2)  # Random action
+        
+        with torch.no_grad():
+            state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            q_values = self.q_network(state_tensor)
+            return q_values.argmax().item()
+    
+    def store_transition(self, state, action, reward, next_state, done):
+        """Store transition in replay buffer"""
+        self.replay_buffer.append((state, action, reward, next_state, done))
+    
+    def train_step(self):
+        """Train on a minibatch from replay buffer"""
+        if len(self.replay_buffer) < self.batch_size:
+            return None
+        
+        # Sample random minibatch
+        batch = random.sample(self.replay_buffer, self.batch_size)
+        states, actions, rewards, next_states, dones = zip(*batch)
+        
+        # Convert to tensors
+        states = torch.FloatTensor(states).to(self.device)
+        actions = torch.LongTensor(actions).to(self.device)
+        rewards = torch.FloatTensor(rewards).to(self.device)
+        next_states = torch.FloatTensor(next_states).to(self.device)
+        dones = torch.FloatTensor(dones).to(self.device)
+        
+        # Current Q-values
+        current_q = self.q_network(states).gather(1, actions.unsqueeze(1))
+        
+        # Target Q-values (Double DQN)
+        with torch.no_grad():
+            next_actions = self.q_network(next_states).argmax(1)
+            next_q = self.target_network(next_states).gather(1, next_actions.unsqueeze(1))
+            target_q = rewards.unsqueeze(1) + (1 - dones.unsqueeze(1)) * self.gamma * next_q
+        
+        # Compute loss and update
+        loss = self.criterion(current_q, target_q)
+        
+        self.optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.q_network.parameters(), 1.0)
+        self.optimizer.step()
+        
+        self.losses.append(loss.item())
+        return loss.item()
+    
+    def update_target_network(self):
+        """Soft update of target network"""
+        self.target_network.load_state_dict(self.q_network.state_dict())
+    
+    def train_episode(self, env, max_steps=100):
+        """Train for one episode"""
+        state = env.reset()
+        episode_reward = 0
+        
+        for step in range(max_steps):
+            # Select and perform action
+            action = self.select_action(state)
+            next_state, reward, done = env.step(action)
+            
+            # Store transition
+            self.store_transition(state, action, reward, next_state, done)
+            
+            # Train on minibatch
+            loss = self.train_step()
+            
+            episode_reward += reward
+            state = next_state
+            
+            if done:
+                break
+        
+        # Update target network every episode
+        if len(self.episode_rewards) % 10 == 0:
+            self.update_target_network()
+        
+        self.episode_rewards.append(episode_reward)
+        return episode_reward
+
+
+# Training function
+def train_dqn_agent(episodes=1000, verbose=True):
+    """Train DQN agent"""
+    env = TaskAllocationEnvironment()
+    
+    # Convert state to continuous representation
+    state_dim = 3  # [fatigue, queue, ambiguity]
+    action_dim = 3  # [human, robot, pause]
+    
+    agent = DQNAgent(state_dim, action_dim)
+    
+    for ep in range(episodes):
+        reward = agent.train_episode(env, max_steps=50)
+        
+        if verbose and (ep + 1) % 100 == 0:
+            avg_reward = np.mean(agent.episode_rewards[-100:])
+            avg_loss = np.mean(agent.losses[-100:]) if agent.losses else 0
+            print(f"Episode {ep+1}/{episodes}, Avg Reward: {avg_reward:.2f}, Avg Loss: {avg_loss:.4f}")
+    
+    return agent

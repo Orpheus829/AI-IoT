@@ -19,6 +19,7 @@ from modules.cognitive_model import IntegratedCognitiveModel
 from modules.semantic_disambiguation import IntegratedWSDSystem, INDUSTRIAL_SENSE_INVENTORY, INDUSTRIAL_GLOSSES
 from modules.rl_agent import train_rl_agent
 from modules.simulation import AIoTWorkSystemSimulation, CognitiveWorkloadSimulation
+from modules.forecasting import SensorForecaster
 
 def setup_directories():
     """Create necessary directories"""
@@ -102,6 +103,26 @@ def analyze_stochastic_models(df):
     print(f"\n✓ M/M/1 Queue (λ=40, μ=60):")
     print(f"  Utilization: {queue.utilization():.2f}")
     print(f"  Mean wait: {queue.mean_waiting_time():.4f} hours")
+
+def test_lstm_forecasting(df):
+    print("\n" + "=" * 60)
+    print("STEP 4: LSTM Forecasting for Sensor Data")
+    print("=" * 60)
+
+    forecaster = SensorForecaster(input_features=5, sequence_length=10)
+
+    #Train on data
+    losses = forecaster.train(df[:8000], epochs = 30)
+    print(f"✓ LSTM trained, final loss: {losses[-1]:.4f}")
+
+    #Test forecasting
+    test_sequence = df[['air_temp', 'process_temp', 'rotational_speed', 'torque', 'tool_wear']].values[8000:8010]
+
+    predictions = forecaster.forecast_horizon(test_sequence=test_sequence, steps=5)
+    actuals = df['tool_wear'].values[8010:8015]
+
+    rmse = np.sqrt(np.mean((predictions - actuals) ** 2))    
+    print(f"✓ LSTM forecasting completed, RMSE: {rmse:.4f}")
 
 def test_cognitive_models():
     """Test cognitive process models"""
